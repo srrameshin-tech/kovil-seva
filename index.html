@@ -12,7 +12,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, push, update, remove, query, orderByChild } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBVGVu59jDZybPFAX_pRisSrQRoXHQ0EWY",
@@ -57,6 +57,11 @@ window.addEventListener('error', (e)=> logAppError('JS Error', e.message, (e.fil
 window.addEventListener('unhandledrejection', (e)=>{ const r=e.reason; logAppError('Unhandled Promise', r&&r.message?r.message:String(r), r&&r.stack?r.stack.slice(0,400):''); });
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushErrorLogQueue(); });
 window.logAppError = logAppError;
+window.firebaseAuth = auth;
+window.firebaseSignInEmail = signInWithEmailAndPassword;
+window.firebaseCreateUserEmail = createUserWithEmailAndPassword;
+window.firebaseSignOut = signOut;
+window.firebaseSignInAnon = signInAnonymously;
 window.firebaseReady = true;
 </script>
 <style>
@@ -239,10 +244,21 @@ input,select{font-family:inherit;}
 <div id="adminLogin">
   <div class="al-box">
     <h3>🔐 நிர்வாகி உள்நுழைவு</h3>
-    <input type="password" id="adminPinInput" placeholder="PIN" maxlength="6" inputmode="numeric">
-    <div class="err" id="adminLoginErr">தவறான PIN</div>
-    <button class="btn" id="adminLoginBtn">உள்நுழைய</button>
-    <button class="btn outline" id="adminLoginCancel" style="margin-top:10px">Cancel</button>
+    <div id="alPinStep">
+      <input type="password" id="adminPinInput" placeholder="PIN" maxlength="6" inputmode="numeric">
+      <div class="err" id="adminLoginErr">தவறான PIN</div>
+      <button class="btn" id="adminLoginBtn">உள்நுழைய</button>
+      <button class="btn outline" id="adminLoginCancel" style="margin-top:10px">Cancel</button>
+    </div>
+    <div id="alEmailStep" style="display:none">
+      <p style="font-size:12.5px;color:#666;margin-bottom:12px;">Admin account login (real security check)</p>
+      <input type="email" class="inp" id="adminEmailInput" placeholder="Email" autocomplete="username">
+      <input type="password" class="inp" id="adminPasswordInput" placeholder="Password" autocomplete="current-password">
+      <div class="err" id="adminEmailErr"></div>
+      <button class="btn" id="adminEmailLoginBtn">உள்நுழைய (Login)</button>
+      <button class="btn green" id="adminEmailSignupBtn" style="margin-top:10px">முதல் முறை? Admin Account உருவாக்க</button>
+      <button class="btn outline" id="adminEmailCancel" style="margin-top:10px">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -550,23 +566,71 @@ input,select{font-family:inherit;}
     document.getElementById('adminLoginCancel').addEventListener('click', ()=>{
       document.getElementById('adminLogin').classList.remove('show');
     });
+    function openAdminPanel(){
+      document.getElementById('adminLogin').classList.remove('show');
+      document.getElementById('publicPage').style.display='none';
+      document.getElementById('adminPanel').style.display='block';
+    }
     document.getElementById('adminLoginBtn').addEventListener('click', async ()=>{
       const pin = document.getElementById('adminPinInput').value.trim();
       const hash = await sha256Hex(pin);
-      if(hash === settings.pinHash){
-        document.getElementById('adminLogin').classList.remove('show');
-        document.getElementById('publicPage').style.display='none';
-        document.getElementById('adminPanel').style.display='block';
+      if(hash !== settings.pinHash){ document.getElementById('adminLoginErr').style.display='block'; return; }
+      document.getElementById('adminLoginErr').style.display='none';
+      const cu = window.firebaseAuth.currentUser;
+      if(cu && !cu.isAnonymous){
+        // Already have a real admin session on this device
+        openAdminPanel();
       } else {
-        document.getElementById('adminLoginErr').style.display='block';
+        document.getElementById('alPinStep').style.display='none';
+        document.getElementById('alEmailStep').style.display='block';
+        document.getElementById('adminEmailErr').style.display='none';
+      }
+    });
+    document.getElementById('adminEmailCancel').addEventListener('click', ()=>{
+      document.getElementById('adminLogin').classList.remove('show');
+      document.getElementById('alEmailStep').style.display='none';
+      document.getElementById('alPinStep').style.display='block';
+    });
+    document.getElementById('adminEmailLoginBtn').addEventListener('click', async ()=>{
+      const email = document.getElementById('adminEmailInput').value.trim();
+      const pw = document.getElementById('adminPasswordInput').value;
+      const errEl = document.getElementById('adminEmailErr');
+      errEl.style.display='none';
+      try{
+        await window.firebaseSignInEmail(window.firebaseAuth, email, pw);
+        openAdminPanel();
+      }catch(e){
+        errEl.textContent = 'Login தவறு: Email/Password சரிபார்க்கவும்';
+        errEl.style.display='block';
+        window.logAppError('admin email login', e.message);
+      }
+    });
+    document.getElementById('adminEmailSignupBtn').addEventListener('click', async ()=>{
+      const email = document.getElementById('adminEmailInput').value.trim();
+      const pw = document.getElementById('adminPasswordInput').value;
+      const errEl = document.getElementById('adminEmailErr');
+      errEl.style.display='none';
+      if(!email || pw.length < 6){ errEl.textContent='Email & 6+ character password உள்ளிடவும்'; errEl.style.display='block'; return; }
+      try{
+        const cred = await window.firebaseCreateUserEmail(window.firebaseAuth, email, pw);
+        await set(ref(db,'templeSeva/members/'+cred.user.uid), {name:'Admin', email, role:'admin', status:'approved', created:Date.now()});
+        toast('Admin account உருவாக்கப்பட்டது ✓');
+        openAdminPanel();
+      }catch(e){
+        errEl.textContent = 'பிழை: '+(e.message||'').slice(0,80);
+        errEl.style.display='block';
+        window.logAppError('admin signup', e.message);
       }
     });
     document.getElementById('viewPublicBtn').addEventListener('click', ()=>{
       window.open(location.origin + location.pathname, '_blank');
     });
-    document.getElementById('adminLogout').addEventListener('click', ()=>{
+    document.getElementById('adminLogout').addEventListener('click', async ()=>{
+      try{ await window.firebaseSignOut(window.firebaseAuth); await window.firebaseSignInAnon(window.firebaseAuth); }catch(e){}
       document.getElementById('adminPanel').style.display='none';
       document.getElementById('publicPage').style.display='block';
+      document.getElementById('alEmailStep').style.display='none';
+      document.getElementById('alPinStep').style.display='block';
     });
 
     // ========================= ADMIN: TABS =========================
