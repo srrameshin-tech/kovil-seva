@@ -251,7 +251,10 @@ input,select{font-family:inherit;}
   <div class="hdr" style="padding:12px 14px;">
     <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:520px;margin:0 auto;">
       <span style="color:#FFD700;font-weight:800;font-size:14px;">🛕 Admin - Kovil Seva</span>
-      <button id="adminLogout" style="background:none;border:1.5px solid #FFD700;color:#FFD700;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;">Logout</button>
+      <div style="display:flex;gap:8px;">
+        <button id="viewPublicBtn" style="background:none;border:1.5px solid #FFD700;color:#FFD700;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:700;">🏠 பொது பக்கம்</button>
+        <button id="adminLogout" style="background:none;border:1.5px solid #FFD700;color:#FFD700;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;">Logout</button>
+      </div>
     </div>
   </div>
   <div class="tabbar">
@@ -534,6 +537,9 @@ input,select{font-family:inherit;}
       } else {
         document.getElementById('adminLoginErr').style.display='block';
       }
+    });
+    document.getElementById('viewPublicBtn').addEventListener('click', ()=>{
+      window.open(location.origin + location.pathname, '_blank');
     });
     document.getElementById('adminLogout').addEventListener('click', ()=>{
       document.getElementById('adminPanel').style.display='none';
