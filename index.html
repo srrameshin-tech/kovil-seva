@@ -128,6 +128,7 @@ input,select{font-family:inherit;}
 .status-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:11.5px;font-weight:800;}
 .status-badge.pending{background:#FFF3CD;color:#946200;}
 .status-badge.verified{background:#D4EDDA;color:#1B5E20;}
+.status-badge.cancelled{background:#F0F0F0;color:#888;}
 
 /* ---------- ADMIN LOGIN ---------- */
 #adminLogin{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:200;padding:20px;}
@@ -737,11 +738,11 @@ input,select{font-family:inherit;}
         return `<div class="book-item">
           <div class="top">
             <div><div class="nm">${b.name}</div><div class="ph">📞 ${b.phone} • 📅 ${fmtDate(b.date)}</div></div>
-            <span class="status-badge ${b.status}">${b.status==='verified'?'உறுதி':'நிலுவை'}</span>
+            <span class="status-badge ${b.status}">${b.status==='verified'?'உறுதி':b.status==='cancelled'?'ரத்து செய்யப்பட்டது':'நிலுவை'}</span>
           </div>
           <div class="svc-list">${svcTxt}</div>
           <div class="amt">₹${b.totalAmount}</div>
-          ${b.status!=='verified' ? `<div class="actions">
+          ${b.status==='pending' ? `<div class="actions">
             <button style="background:#1B5E20;color:#fff;" data-verify="${id}">✅ Verify பண்ண</button>
             <button style="background:#eee;color:#333;" data-cancel="${id}">✕ Cancel</button>
           </div>` : ''}
