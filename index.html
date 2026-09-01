@@ -91,7 +91,15 @@ input,select{font-family:inherit;}
 .inp:focus{border-color:var(--orange);}
 
 /* ---------- SERVICE LIST ---------- */
-.svc{display:flex;align-items:center;gap:10px;padding:12px;border:1.5px solid var(--border);border-radius:10px;margin-bottom:10px;background:var(--card2);}
+.svc{display:flex;align-items:center;gap:10px;padding:12px;border:1.5px solid var(--border);border-radius:10px;background:var(--card2);}
+.svc-block{border:1.5px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;background:var(--card2);}
+.svc-block.disabled{opacity:.45;pointer-events:none;}
+.svc-block .svc{border:none;border-radius:0;margin-bottom:0;}
+.qty-row{display:none;align-items:center;gap:10px;padding:10px 12px 12px;border-top:1px dashed var(--border);background:#fff;}
+.qty-row span{font-size:12px;color:#666;font-weight:700;}
+.qty-btn{width:32px;height:32px;border:1.5px solid var(--border);background:#fff;border-radius:8px;font-size:18px;font-weight:800;color:var(--red);flex-shrink:0;}
+.qty-input{width:52px;text-align:center;padding:6px 4px;border:1.5px solid #ddd;border-radius:8px;font-size:15px;font-weight:700;}
+.qty-subtotal{margin-left:auto;font-weight:800;color:var(--red);font-size:14px;}
 .svc.disabled{opacity:.45;pointer-events:none;}
 .svc input[type=checkbox]{width:22px;height:22px;accent-color:var(--orange);flex-shrink:0;}
 .svc .sname{flex:1;font-size:14.5px;font-weight:700;color:#222;}
@@ -426,7 +434,7 @@ input,select{font-family:inherit;}
       let count = 0;
       Object.values(bookings).forEach(b=>{
         if(b.date===dateStr && b.status!=='cancelled' && Array.isArray(b.services)){
-          b.services.forEach(s=>{ if(s.id===serviceId) count++; });
+          b.services.forEach(s=>{ if(s.id===serviceId) count += (s.qty||1); });
         }
       });
       return count;
@@ -439,29 +447,82 @@ input,select{font-family:inherit;}
       const dateStr = bkDate.value || todayStr();
       el.innerHTML = list.map(([id,s])=>{
         const used = s.maxPerDay>0 ? countBookingsForDate(dateStr, id) : 0;
-        const full = s.maxPerDay>0 && used>=s.maxPerDay;
-        const checked = selectedServices[id] ? 'checked' : '';
-        return `<label class="svc ${full?'disabled':''}">
-          <input type="checkbox" data-id="${id}" data-rate="${s.rate}" data-name="${s.nameTa}" ${checked} ${full?'disabled':''}>
-          <div>
-            <div class="sname">${s.nameTa}</div>
-            <div class="sfull ${full?'full':''}">${s.nameEn}${full?' — இன்று இடம் நிறைவு':''}</div>
+        const remaining = s.maxPerDay>0 ? Math.max(0, s.maxPerDay-used) : null;
+        const full = s.maxPerDay>0 && remaining<=0;
+        const sel = selectedServices[id];
+        const checked = sel ? 'checked' : '';
+        const qty = sel ? sel.qty : 1;
+        return `<div class="svc-block ${full?'disabled':''}">
+          <label class="svc">
+            <input type="checkbox" data-id="${id}" data-rate="${s.rate}" data-name="${s.nameTa}" ${checked} ${full?'disabled':''}>
+            <div>
+              <div class="sname">${s.nameTa}</div>
+              <div class="sfull ${full?'full':''}">${s.nameEn}${full?' — இன்று இடம் நிறைவு':(remaining!==null?' • '+remaining+' இடங்கள் மீதம்':'')}</div>
+            </div>
+            <div class="srate">₹${s.rate}</div>
+          </label>
+          <div class="qty-row" data-qty-row="${id}" style="display:${checked?'flex':'none'}">
+            <span>நபர்கள் எண்ணிக்கை</span>
+            <button type="button" class="qty-btn" data-qty-minus="${id}">−</button>
+            <input type="number" class="qty-input" data-qty-id="${id}" min="1" value="${qty}">
+            <button type="button" class="qty-btn" data-qty-plus="${id}">+</button>
+            <span class="qty-subtotal" data-qty-sub="${id}">= ₹${s.rate*qty}</span>
           </div>
-          <div class="srate">₹${s.rate}</div>
-        </label>`;
+        </div>`;
       }).join('');
+
+      function applyQty(id, v){
+        const svc = services[id];
+        v = parseInt(v)||1;
+        if(v<1) v=1;
+        if(svc.maxPerDay>0){
+          const used = countBookingsForDate(dateStr, id);
+          const remaining = Math.max(0, svc.maxPerDay-used);
+          if(remaining>0 && v>remaining) v = remaining;
+        }
+        const inp = el.querySelector(`[data-qty-id="${id}"]`);
+        if(inp) inp.value = v;
+        if(selectedServices[id]) selectedServices[id].qty = v;
+        const subEl = el.querySelector(`[data-qty-sub="${id}"]`);
+        if(subEl) subEl.textContent = '= ₹'+(svc.rate*v);
+        updateTotal();
+      }
+
       el.querySelectorAll('input[type=checkbox]').forEach(cb=>{
         cb.addEventListener('change', function(){
           const id=this.dataset.id;
-          if(this.checked) selectedServices[id] = {id, rate:Number(this.dataset.rate), name:this.dataset.name};
-          else delete selectedServices[id];
+          const qtyRow = el.querySelector(`[data-qty-row="${id}"]`);
+          if(this.checked){
+            selectedServices[id] = {id, rate:Number(this.dataset.rate), name:this.dataset.name, qty:1};
+            if(qtyRow) qtyRow.style.display='flex';
+          } else {
+            delete selectedServices[id];
+            if(qtyRow) qtyRow.style.display='none';
+          }
           updateTotal();
+        });
+      });
+      el.querySelectorAll('[data-qty-id]').forEach(inp=>{
+        inp.addEventListener('input', function(){ applyQty(this.dataset.qtyId, this.value); });
+      });
+      el.querySelectorAll('[data-qty-plus]').forEach(btn=>{
+        btn.addEventListener('click', function(){
+          const id=this.dataset.qtyPlus;
+          const inp = el.querySelector(`[data-qty-id="${id}"]`);
+          applyQty(id, (parseInt(inp.value)||1)+1);
+        });
+      });
+      el.querySelectorAll('[data-qty-minus]').forEach(btn=>{
+        btn.addEventListener('click', function(){
+          const id=this.dataset.qtyMinus;
+          const inp = el.querySelector(`[data-qty-id="${id}"]`);
+          applyQty(id, (parseInt(inp.value)||1)-1);
         });
       });
     }
 
     function updateTotal(){
-      const total = Object.values(selectedServices).reduce((s,v)=>s+v.rate,0);
+      const total = Object.values(selectedServices).reduce((s,v)=>s+v.rate*(v.qty||1),0);
       document.getElementById('totalAmt').textContent = '₹'+total;
     }
 
@@ -479,9 +540,13 @@ input,select{font-family:inherit;}
       if(!/^\d{10}$/.test(phone)){ errEl.textContent='சரியான 10 இலக்க கைபேசி எண்ணை உள்ளிடவும்'; errEl.style.display='block'; return; }
       if(!settings.upiId){ errEl.textContent='UPI ID இன்னும் அமைக்கப்படவில்லை. நிர்வாகியை தொடர்பு கொள்ளவும்.'; errEl.style.display='block'; return; }
 
-      const total = svcs.reduce((s,v)=>s+v.rate,0);
-      // Assign a token/queue number per service based on how many bookings already exist for that date+service
-      svcs.forEach(s=>{ s.token = countBookingsForDate(dateStr, s.id) + 1; });
+      const total = svcs.reduce((s,v)=>s+v.rate*(v.qty||1),0);
+      // Assign a token/queue range per service based on how many bookings already exist for that date+service
+      svcs.forEach(s=>{
+        const startCount = countBookingsForDate(dateStr, s.id);
+        s.tokenFrom = startCount + 1;
+        s.tokenTo = startCount + (s.qty||1);
+      });
       const bookingData = { name, phone, date: dateStr, services: svcs, totalAmount: total, status:'pending', createdAt: Date.now() };
 
       const newRef = push(ref(db,'templeSeva/bookings'));
@@ -520,7 +585,12 @@ input,select{font-family:inherit;}
       document.getElementById('paymentCard').style.display='none';
       document.getElementById('receiptCard').style.display='block';
       const b = currentBookingData;
-      const svcLines = b.services.map(s=>`<div class="rrow"><span>${s.name} ${s.token?'(டோக்கன் #'+s.token+')':''}</span><b>₹${s.rate}</b></div>`).join('');
+      const svcLines = b.services.map(s=>{
+        const qty = s.qty||1;
+        const qtyTxt = qty>1 ? ' × '+qty+' நபர்கள்' : '';
+        const tokenTxt = s.tokenFrom ? (s.tokenFrom===s.tokenTo ? 'டோக்கன் #'+s.tokenFrom : 'டோக்கன் #'+s.tokenFrom+'-'+s.tokenTo) : '';
+        return `<div class="rrow"><span>${s.name}${qtyTxt}${tokenTxt?' ('+tokenTxt+')':''}</span><b>₹${s.rate*qty}</b></div>`;
+      }).join('');
       document.getElementById('receiptBody').innerHTML = `
         <div class="rrow"><span>முன்பதிவு எண்</span><b>${currentBookingId.slice(-8).toUpperCase()}</b></div>
         <div class="rrow"><span>பெயர்</span><b>${b.name}</b></div>
@@ -535,7 +605,11 @@ input,select{font-family:inherit;}
 
     document.getElementById('waShareBtn').addEventListener('click', function(){
       const b = currentBookingData;
-      const svcTxt = b.services.map(s=>`${s.name}${s.token?' (Token #'+s.token+')':''} - ₹${s.rate}`).join(', ');
+      const svcTxt = b.services.map(s=>{
+        const qty = s.qty||1;
+        const tokenTxt = s.tokenFrom ? (s.tokenFrom===s.tokenTo ? 'Token #'+s.tokenFrom : 'Token #'+s.tokenFrom+'-'+s.tokenTo) : '';
+        return `${s.name}${qty>1?' x'+qty:''}${tokenTxt?' ('+tokenTxt+')':''} - ₹${s.rate*qty}`;
+      }).join(', ');
       const msg = `🛕 ${settings.templeNameTa}\nமுன்பதிவு எண்: ${currentBookingId.slice(-8).toUpperCase()}\nபெயர்: ${b.name}\nகைபேசி: ${b.phone}\nதேதி: ${fmtDate(b.date)}\nசேவை: ${svcTxt}\nமொத்தம்: ₹${b.totalAmount}\n\nPayment செய்துவிட்டேன், தயவுசெய்து உறுதிப்படுத்தவும்.`;
       const targetPhone = settings.adminPhone ? '91'+settings.adminPhone : '';
       window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(msg)}`, '_blank');
@@ -736,7 +810,11 @@ input,select{font-family:inherit;}
       list.sort((a,b)=>(b[1].createdAt||0)-(a[1].createdAt||0));
       if(list.length===0){ el.innerHTML='<div class="empty">முன்பதிவுகள் இல்லை</div>'; return; }
       el.innerHTML = list.map(([id,b])=>{
-        const svcTxt = (b.services||[]).map(s=>s.name+(s.token?' #'+s.token:'')+' (₹'+s.rate+')').join(', ');
+        const svcTxt = (b.services||[]).map(s=>{
+          const qty = s.qty||1;
+          const tokenTxt = s.tokenFrom ? (s.tokenFrom===s.tokenTo?' #'+s.tokenFrom:' #'+s.tokenFrom+'-'+s.tokenTo) : '';
+          return s.name+(qty>1?' x'+qty:'')+tokenTxt+' (₹'+(s.rate*qty)+')';
+        }).join(', ');
         return `<div class="book-item">
           <div class="top">
             <div><div class="nm">${b.name}</div><div class="ph">📞 ${b.phone} • 📅 ${fmtDate(b.date)}</div></div>
