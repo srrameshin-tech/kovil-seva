@@ -572,12 +572,12 @@ input,select{font-family:inherit;}
       document.getElementById('adminPanel').style.display='block';
     }
     async function bootstrapAdminMemberIfNeeded(uid, email){
+      // Don't pre-check via read (that itself requires admin role - circular).
+      // Just attempt the write; the security rule's own !root.child('templeSeva/members').exists()
+      // check will silently reject this if an admin already exists elsewhere - that's fine.
       try{
-        const memberSnap = await get(ref(db,'templeSeva/members'));
-        if(!memberSnap.exists()){
-          await set(ref(db,'templeSeva/members/'+uid), {name:'Admin', email: email||'', role:'admin', status:'approved', created:Date.now()});
-        }
-      }catch(memErr){ window.logAppError('member bootstrap', memErr.message); }
+        await set(ref(db,'templeSeva/members/'+uid), {name:'Admin', email: email||'', role:'admin', status:'approved', created:Date.now()});
+      }catch(memErr){ /* expected to fail silently once a member already exists */ }
     }
     document.getElementById('adminLoginBtn').addEventListener('click', async ()=>{
       const pin = document.getElementById('adminPinInput').value.trim();
