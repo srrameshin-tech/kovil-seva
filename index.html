@@ -571,6 +571,14 @@ input,select{font-family:inherit;}
       document.getElementById('publicPage').style.display='none';
       document.getElementById('adminPanel').style.display='block';
     }
+    async function bootstrapAdminMemberIfNeeded(uid, email){
+      try{
+        const memberSnap = await get(ref(db,'templeSeva/members'));
+        if(!memberSnap.exists()){
+          await set(ref(db,'templeSeva/members/'+uid), {name:'Admin', email: email||'', role:'admin', status:'approved', created:Date.now()});
+        }
+      }catch(memErr){ window.logAppError('member bootstrap', memErr.message); }
+    }
     document.getElementById('adminLoginBtn').addEventListener('click', async ()=>{
       const pin = document.getElementById('adminPinInput').value.trim();
       const hash = await sha256Hex(pin);
@@ -578,7 +586,8 @@ input,select{font-family:inherit;}
       document.getElementById('adminLoginErr').style.display='none';
       const cu = window.firebaseAuth.currentUser;
       if(cu && !cu.isAnonymous){
-        // Already have a real admin session on this device
+        // Already have a real admin session on this device - ensure member record exists too
+        await bootstrapAdminMemberIfNeeded(cu.uid, cu.email);
         openAdminPanel();
       } else {
         document.getElementById('alPinStep').style.display='none';
@@ -598,13 +607,7 @@ input,select{font-family:inherit;}
       errEl.style.display='none';
       try{
         const cred = await window.firebaseSignInEmail(window.firebaseAuth, email, pw);
-        // Recovery: if no member record exists yet (e.g. earlier signup partially failed), bootstrap this account as admin
-        try{
-          const memberSnap = await get(ref(db,'templeSeva/members'));
-          if(!memberSnap.exists()){
-            await set(ref(db,'templeSeva/members/'+cred.user.uid), {name:'Admin', email, role:'admin', status:'approved', created:Date.now()});
-          }
-        }catch(memErr){ window.logAppError('member bootstrap on login', memErr.message); }
+        await bootstrapAdminMemberIfNeeded(cred.user.uid, email);
         openAdminPanel();
       }catch(e){
         errEl.textContent = 'Login தவறு: '+(e.message||'').slice(0,100);
