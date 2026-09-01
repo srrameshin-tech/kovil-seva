@@ -480,6 +480,8 @@ input,select{font-family:inherit;}
       if(!settings.upiId){ errEl.textContent='UPI ID இன்னும் அமைக்கப்படவில்லை. நிர்வாகியை தொடர்பு கொள்ளவும்.'; errEl.style.display='block'; return; }
 
       const total = svcs.reduce((s,v)=>s+v.rate,0);
+      // Assign a token/queue number per service based on how many bookings already exist for that date+service
+      svcs.forEach(s=>{ s.token = countBookingsForDate(dateStr, s.id) + 1; });
       const bookingData = { name, phone, date: dateStr, services: svcs, totalAmount: total, status:'pending', createdAt: Date.now() };
 
       const newRef = push(ref(db,'templeSeva/bookings'));
@@ -518,7 +520,7 @@ input,select{font-family:inherit;}
       document.getElementById('paymentCard').style.display='none';
       document.getElementById('receiptCard').style.display='block';
       const b = currentBookingData;
-      const svcLines = b.services.map(s=>`<div class="rrow"><span>${s.name}</span><b>₹${s.rate}</b></div>`).join('');
+      const svcLines = b.services.map(s=>`<div class="rrow"><span>${s.name} ${s.token?'(டோக்கன் #'+s.token+')':''}</span><b>₹${s.rate}</b></div>`).join('');
       document.getElementById('receiptBody').innerHTML = `
         <div class="rrow"><span>முன்பதிவு எண்</span><b>${currentBookingId.slice(-8).toUpperCase()}</b></div>
         <div class="rrow"><span>பெயர்</span><b>${b.name}</b></div>
@@ -533,7 +535,7 @@ input,select{font-family:inherit;}
 
     document.getElementById('waShareBtn').addEventListener('click', function(){
       const b = currentBookingData;
-      const svcTxt = b.services.map(s=>`${s.name} - ₹${s.rate}`).join(', ');
+      const svcTxt = b.services.map(s=>`${s.name}${s.token?' (Token #'+s.token+')':''} - ₹${s.rate}`).join(', ');
       const msg = `🛕 ${settings.templeNameTa}\nமுன்பதிவு எண்: ${currentBookingId.slice(-8).toUpperCase()}\nபெயர்: ${b.name}\nகைபேசி: ${b.phone}\nதேதி: ${fmtDate(b.date)}\nசேவை: ${svcTxt}\nமொத்தம்: ₹${b.totalAmount}\n\nPayment செய்துவிட்டேன், தயவுசெய்து உறுதிப்படுத்தவும்.`;
       const targetPhone = settings.adminPhone ? '91'+settings.adminPhone : '';
       window.open(`https://wa.me/${targetPhone}?text=${encodeURIComponent(msg)}`, '_blank');
@@ -734,7 +736,7 @@ input,select{font-family:inherit;}
       list.sort((a,b)=>(b[1].createdAt||0)-(a[1].createdAt||0));
       if(list.length===0){ el.innerHTML='<div class="empty">முன்பதிவுகள் இல்லை</div>'; return; }
       el.innerHTML = list.map(([id,b])=>{
-        const svcTxt = (b.services||[]).map(s=>s.name+' (₹'+s.rate+')').join(', ');
+        const svcTxt = (b.services||[]).map(s=>s.name+(s.token?' #'+s.token:'')+' (₹'+s.rate+')').join(', ');
         return `<div class="book-item">
           <div class="top">
             <div><div class="nm">${b.name}</div><div class="ph">📞 ${b.phone} • 📅 ${fmtDate(b.date)}</div></div>
