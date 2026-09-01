@@ -826,6 +826,9 @@ input,select{font-family:inherit;}
             <button style="background:#1B5E20;color:#fff;" data-verify="${id}">✅ Verify பண்ண</button>
             <button style="background:#eee;color:#333;" data-cancel="${id}">✕ Cancel</button>
           </div>` : ''}
+          ${b.status==='cancelled' ? `<div class="actions">
+            <button style="background:#ffdada;color:#8B1A1A;" data-delete="${id}">🗑️ நீக்க (Delete)</button>
+          </div>` : ''}
         </div>`;
       }).join('');
       el.querySelectorAll('[data-verify]').forEach(b=>b.addEventListener('click', function(){
@@ -834,6 +837,11 @@ input,select{font-family:inherit;}
       el.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click', function(){
         if(confirm('இந்த முன்பதிவை ரத்து செய்யவா?')){
           update(ref(db,'templeSeva/bookings/'+this.dataset.cancel), {status:'cancelled'}).then(()=>toast('ரத்து செய்யப்பட்டது')).catch(e=>{window.logAppError('booking cancel',e.message); toast('பிழை: '+e.message);});
+        }
+      }));
+      el.querySelectorAll('[data-delete]').forEach(b=>b.addEventListener('click', function(){
+        if(confirm('இந்த முன்பதிவை முழுவதுமாக நீக்கவா? இதை மீட்க முடியாது.')){
+          remove(ref(db,'templeSeva/bookings/'+this.dataset.delete)).then(()=>toast('நீக்கப்பட்டது ✓')).catch(e=>{window.logAppError('booking delete',e.message); toast('பிழை: '+e.message);});
         }
       }));
     }
