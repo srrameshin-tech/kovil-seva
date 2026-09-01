@@ -486,7 +486,7 @@ input,select{font-family:inherit;}
       currentBookingData = bookingData;
       set(newRef, bookingData).then(()=>{
         showPaymentStep(total);
-      }).catch(e=>{ window.logAppError('booking create', e.message); errEl.textContent='சேமிப்பதில் பிழை, மீண்டும் முயற்சிக்கவும்'; errEl.style.display='block'; });
+      }).catch(e=>{ window.logAppError('booking create', e.message); errEl.textContent='சேமிப்பதில் பிழை: '+e.message; errEl.style.display='block'; });
     });
 
     function showPaymentStep(total){
@@ -662,12 +662,12 @@ input,select{font-family:inherit;}
       `).join('');
       el.querySelectorAll('[data-toggle]').forEach(b=>b.addEventListener('click', function(){
         const id=this.dataset.toggle;
-        update(ref(db,'templeSeva/services/'+id), {active: !services[id].active}).then(()=>toast('புதுப்பிக்கப்பட்டது')).catch(e=>window.logAppError('svc toggle',e.message));
+        update(ref(db,'templeSeva/services/'+id), {active: !services[id].active}).then(()=>toast('புதுப்பிக்கப்பட்டது')).catch(e=>{window.logAppError('svc toggle',e.message); toast('பிழை: '+e.message);});
       }));
       el.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', function(){ openSvcModal(this.dataset.edit); }));
       el.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', function(){
         if(confirm('இந்த சேவையை நீக்கவா?')){
-          remove(ref(db,'templeSeva/services/'+this.dataset.del)).then(()=>toast('நீக்கப்பட்டது')).catch(e=>window.logAppError('svc del',e.message));
+          remove(ref(db,'templeSeva/services/'+this.dataset.del)).then(()=>toast('நீக்கப்பட்டது')).catch(e=>{window.logAppError('svc del',e.message); toast('பிழை: '+e.message);});
         }
       }));
     }
@@ -702,7 +702,7 @@ input,select{font-family:inherit;}
       if(!nameTa || !rate){ toast('பெயர் மற்றும் தொகை கட்டாயம்'); return; }
       const data = {nameTa, nameEn, rate, maxPerDay, active: editingSvcId ? services[editingSvcId].active : true};
       const p = editingSvcId ? update(ref(db,'templeSeva/services/'+editingSvcId), data) : push(ref(db,'templeSeva/services'), data);
-      p.then(()=>{ toast('சேமிக்கப்பட்டது ✓'); document.getElementById('svcModal').style.display='none'; }).catch(e=>window.logAppError('svc save',e.message));
+      p.then(()=>{ toast('சேமிக்கப்பட்டது ✓'); document.getElementById('svcModal').style.display='none'; }).catch(e=>{window.logAppError('svc save',e.message); toast('பிழை: '+e.message);});
     });
 
     // ========================= ADMIN: BOOKINGS =========================
@@ -738,11 +738,11 @@ input,select{font-family:inherit;}
         </div>`;
       }).join('');
       el.querySelectorAll('[data-verify]').forEach(b=>b.addEventListener('click', function(){
-        update(ref(db,'templeSeva/bookings/'+this.dataset.verify), {status:'verified', verifiedAt:Date.now()}).then(()=>toast('உறுதிப்படுத்தப்பட்டது ✓')).catch(e=>window.logAppError('booking verify',e.message));
+        update(ref(db,'templeSeva/bookings/'+this.dataset.verify), {status:'verified', verifiedAt:Date.now()}).then(()=>toast('உறுதிப்படுத்தப்பட்டது ✓')).catch(e=>{window.logAppError('booking verify',e.message); toast('பிழை: '+e.message);});
       }));
       el.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click', function(){
         if(confirm('இந்த முன்பதிவை ரத்து செய்யவா?')){
-          update(ref(db,'templeSeva/bookings/'+this.dataset.cancel), {status:'cancelled'}).then(()=>toast('ரத்து செய்யப்பட்டது')).catch(e=>window.logAppError('booking cancel',e.message));
+          update(ref(db,'templeSeva/bookings/'+this.dataset.cancel), {status:'cancelled'}).then(()=>toast('ரத்து செய்யப்பட்டது')).catch(e=>{window.logAppError('booking cancel',e.message); toast('பிழை: '+e.message);});
         }
       }));
     }
@@ -760,7 +760,7 @@ input,select{font-family:inherit;}
         Object.assign(settings, data);
         document.getElementById('templeNameHdr').textContent = settings.templeNameTa;
         toast('அமைப்புகள் சேமிக்கப்பட்டது ✓');
-      }).catch(e=>window.logAppError('settings save',e.message));
+      }).catch(e=>{window.logAppError('settings save',e.message); toast('பிழை: '+e.message);});
     });
 
     document.getElementById('changePinBtn').addEventListener('click', async ()=>{
@@ -776,7 +776,7 @@ input,select{font-family:inherit;}
         settings.pinHash = newHash;
         document.getElementById('curPin').value=''; document.getElementById('newPin').value='';
         toast('PIN மாற்றப்பட்டது ✓');
-      }).catch(e=>window.logAppError('pin change',e.message));
+      }).catch(e=>{window.logAppError('pin change',e.message); toast('பிழை: '+e.message);});
     });
 
   }); // ready
