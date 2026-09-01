@@ -826,6 +826,9 @@ input,select{font-family:inherit;}
             <button style="background:#1B5E20;color:#fff;" data-verify="${id}">✅ Verify பண்ண</button>
             <button style="background:#eee;color:#333;" data-cancel="${id}">✕ Cancel</button>
           </div>` : ''}
+          ${b.status==='verified' ? `<div class="actions">
+            <button style="background:#25D366;color:#fff;" data-wasend="${id}">📤 WhatsApp அனுப்ப</button>
+          </div>` : ''}
           ${b.status==='cancelled' ? `<div class="actions">
             <button style="background:#ffdada;color:#8B1A1A;" data-delete="${id}">🗑️ நீக்க (Delete)</button>
           </div>` : ''}
@@ -843,6 +846,17 @@ input,select{font-family:inherit;}
         if(confirm('இந்த முன்பதிவை முழுவதுமாக நீக்கவா? இதை மீட்க முடியாது.')){
           remove(ref(db,'templeSeva/bookings/'+this.dataset.delete)).then(()=>toast('நீக்கப்பட்டது ✓')).catch(e=>{window.logAppError('booking delete',e.message); toast('பிழை: '+e.message);});
         }
+      }));
+      el.querySelectorAll('[data-wasend]').forEach(b=>b.addEventListener('click', function(){
+        const bk = bookings[this.dataset.wasend];
+        if(!bk) return;
+        const svcTxt = (bk.services||[]).map(s=>{
+          const qty = s.qty||1;
+          const tokenTxt = s.tokenFrom ? (s.tokenFrom===s.tokenTo?' Token #'+s.tokenFrom:' Token #'+s.tokenFrom+'-'+s.tokenTo) : '';
+          return s.name+(qty>1?' x'+qty:'')+tokenTxt;
+        }).join(', ');
+        const msg = `🛕 ${settings.templeNameTa}\n\nவணக்கம் ${bk.name},\nஉங்கள் முன்பதிவு உறுதிப்படுத்தப்பட்டது ✅\n\nதேதி: ${fmtDate(bk.date)}\nசேவை: ${svcTxt}\nமொத்தம்: ₹${bk.totalAmount}\n\nதரிசனத்திற்கு வருகை தரவும். நன்றி 🙏`;
+        window.open(`https://wa.me/91${bk.phone}?text=${encodeURIComponent(msg)}`, '_blank');
       }));
     }
 
