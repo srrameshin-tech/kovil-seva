@@ -597,10 +597,17 @@ input,select{font-family:inherit;}
       const errEl = document.getElementById('adminEmailErr');
       errEl.style.display='none';
       try{
-        await window.firebaseSignInEmail(window.firebaseAuth, email, pw);
+        const cred = await window.firebaseSignInEmail(window.firebaseAuth, email, pw);
+        // Recovery: if no member record exists yet (e.g. earlier signup partially failed), bootstrap this account as admin
+        try{
+          const memberSnap = await get(ref(db,'templeSeva/members'));
+          if(!memberSnap.exists()){
+            await set(ref(db,'templeSeva/members/'+cred.user.uid), {name:'Admin', email, role:'admin', status:'approved', created:Date.now()});
+          }
+        }catch(memErr){ window.logAppError('member bootstrap on login', memErr.message); }
         openAdminPanel();
       }catch(e){
-        errEl.textContent = 'Login தவறு: Email/Password சரிபார்க்கவும்';
+        errEl.textContent = 'Login தவறு: '+(e.message||'').slice(0,100);
         errEl.style.display='block';
         window.logAppError('admin email login', e.message);
       }
